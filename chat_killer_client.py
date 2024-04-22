@@ -1,17 +1,31 @@
+#TODO : ALARM MSG !!BEAT au serv ;
+#TODO(done) : soit !!cookie soit !!pseudo pour gerer les crashs
+#TODO : Recevoir cookie (avec select) 
+#TODO : Encapsulation des saisies client (!!message messageduclient)
+#TODO(done) : Tolérance aux pannes des terminaux qui exécutent les commandes tail -f LOG et cat > TUBE, relance des terminaux et des commandes : 16/20
+#TODO :Tolérances aux pannes de serveur (détection par échec d'envoi de message au serveur), commande !reconnect : 19/20
 
 
 import os, socket, sys, select, time,signal
-pathfifo = "/tmp/killer.fifo"
-pathlog = "/tmp/killer.log"
+pidsupp=os.getpid()
+pathfifo = "/tmp/killer"+str(pidsupp)+".fifo"
+pathlog = "/tmp/killer"+str(pidsupp)+".log"
 
 MAXBYTES = 4096
-if len(sys.argv) == 3:
-    pseudo = input("Entrez votre pseudo: ")
-elif len(sys.argv) == 4:
-    pseudo = sys.argv[3]
-else:
+
+COOKIE = False
+
+
+
+if len(sys.argv) <= 2:
     print('Usage:', sys.argv[0], 'hote port')
     sys.exit(1)
+elif  not(os.path.exists("/tmp/killer.cookie")):
+    pseudo = input("Entrez votre pseudo: ")
+else :
+	COOKIE = True
+	
+
 HOST = sys.argv[1]
 PORT = int(sys.argv[2])
 sockaddr = (HOST, PORT)
@@ -19,7 +33,14 @@ sockaddr = (HOST, PORT)
 try:
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4, TCP
     server.connect(sockaddr)
-    server.send(str('!pseudo ' + pseudo).encode())
+    if COOKIE :
+    	fd = os.open("/tmp/killer.cookie", os.O_RDONLY)
+    	fdr=os.read(fd,MAXBYTES).decode()
+    	server.send(str('!!cookie'+fdr).encode())
+    	os.close(fd)
+    else :
+    	print("pseudo envoyé")
+    	server.send(str('!!pseudo ' + pseudo).encode())
 except socket.error as e:
     print('erreur connexion:', e)
     sys.exit(1)
@@ -47,28 +68,44 @@ except :
 	except: 
 		print("erreur d'exit")
 
+def term_saisie():    #tant que run == True, fermer un term le relance tout de suite
+	global pathfifo
+	global run
+	while run :
+		pid = os.fork()
+		if pid == 0:
+			argv=["xterm","-e","cat > "+pathfifo]
+			os.execvp("xterm",argv) #lance le terminal ou entree standard > fifo
+		else :
+			os.wait()
+			
 
-
+def term_affichage():	#tant que run == True, fermer un term le relance tout de suite
+	global pathlog
+	global run
+	while run :
+		pid = os.fork()
+		if pid == 0:
+			argv1 =["xterm","-e","tail -f "+pathlog]
+			os.execvp("xterm",argv1)
+		else :
+			os.wait()
+			
 
 pid = os.fork()
 
 if pid == 0:
-	print("cat fifo")
-	argv=["xterm","-e","cat > "+pathfifo]
-	#os.system('xterm -e "cat >/tmp/killer.fifo"')
-	os.execvp("xterm",argv) #lance le terminal ou entree standard > fifo
-
+	term_saisie()
 else :
 	fifo=os.open(pathfifo,os.O_RDONLY) #descripteur de fichier fifo readonly
 	socketlist.append(fifo)
 	log=os.open(pathlog, os.O_APPEND|os.O_TRUNC|os.O_CREAT|os.O_WRONLY) #descripteur de fichier log append, create if not exist, supprime le contenu à l'ouverture
 	pid2= os.fork()
 	if pid2== 0:
-		argv1 =["xterm","-e","tail -f "+pathlog]
-		os.execvp("xterm",argv1)
+		term_affichage()
 	else:
 		help(log)
-		while run:
+		while run :
 			(activesockets, _, _) = select.select(socketlist, [], [])
 			for s in activesockets:
 				
@@ -106,4 +143,3 @@ else :
 						# run = False
 						break
 					os.write(log, data)
-
