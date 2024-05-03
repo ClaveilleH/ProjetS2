@@ -114,6 +114,28 @@ def message_client(sock, server):
         pass
     else:
         text = message.decode()
+        if text[:2] == "!!":
+            text = text[2:]
+            if text == "BEAT\n":
+                server.dicoClients[sock] = (server.dicoClients[sock][0], server.dicoClients[sock][1], server.dicoClients[sock][2], server.dicoClients[sock][3], time.time())
+            elif text == "QUIT\n" or text == "quit\n":
+                disconnect_client(sock, server)
+                print(f"Client {server.dicoClients[sock][2]} disconnected")
+            elif text[:8] == "!!message ":
+                text = text[8:]
+                if text[0] == '@':
+                    pseudo = text.split()[0][1:]
+                    pseudo, message = text.split(' ', 1)
+                    if pseudo in server.dicoPseudo.keys():
+                        server.dicoPseudo[pseudo].send(str(f"{server.dicoClients[sock][2]}: {message}").encode())
+                    else:
+                        print(f"Le pseudo {pseudo} n'existe pas.")
+            # if text.split()[0] == "!!cookie:":
+            #     cookie = text.split()[1]
+            #     for key,val in server.dicoClients:
+            #         if cookie == val[3]:
+            #             server.dicoClients[key] = (server.dicoClients[key][0], server.dicoClients[key][1], server.dicoClients[key][2], cookie[3], time.time())
+
         if text[0] == '!': #commandes
             if text[1] == '!': #commandes serveur
                 text = text[2:]
