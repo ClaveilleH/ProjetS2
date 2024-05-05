@@ -52,6 +52,12 @@ def new_client(server):
         if pseudo in server.dicoPseudo.keys():
             # le pseudo existe deja donc 
             pass
+        else:
+            server.dicoPseudo[pseudo] = clientsocket
+            server.dicoClients[clientsocket] = (address, clientsocket, pseudo, time.time())
+            server.nb_clients += 1
+            print("New client connected")
+            mess_all(server, f"[+]{pseudo}!\n".encode())
     
     if txt[:8] == "!!cookie:":
         cookie = txt.split()[1]
@@ -67,6 +73,7 @@ def new_client(server):
     server.dicoPseudo[pseudo] = clientsocket
     server.dicoClients[clientsocket] = (address, clientsocket, pseudo, cookie, time.time())
     server.nb_clients += 1
+    clientsocket.send(str(f"!!cookie:{cookie}\n").encode())
 
     mess_all(server, f"[+]{pseudo}!\n".encode())
     print("New client connected")
