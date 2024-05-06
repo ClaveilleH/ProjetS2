@@ -1,3 +1,11 @@
+#TODO(done) : ALARM MSG !!BEAT au serv ;
+#TODO(done) : soit !!cookie soit !!pseudo pour gerer les crashs
+#TODO(done) : Recevoir cookie (avec select) 
+#TODO(done) : Encapsulation des saisies client (!!message messageduclient)
+#TODO(done) : Tolérance aux pannes des terminaux qui exécutent les commandes tail -f LOG et cat > TUBE, relance des terminaux et des commandes : 16/20
+#TODO :Tolérances aux pannes de serveur (détection par échec d'envoi de message au serveur), commande !reconnect : 19/20
+
+
 import os, socket, sys, select, time,signal
 
 
@@ -35,8 +43,9 @@ def server_connection():
 			fd=os.open("/tmp/killer.cookie", os.O_WRONLY|os.O_CREAT)
 			print("En attente de reception de cookie... ")
 			cookie=server.recv(MAXBYTES).decode('utf-8')
-			cookie = cookie[8:]
 			
+			cookie = cookie.split()[1]
+			print(cookie)
 			os.write(fd,cookie.encode())
 			os.close(fd)
 		signal.signal(signal.SIGALRM, alarm_hdler)
