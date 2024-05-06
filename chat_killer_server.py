@@ -8,7 +8,7 @@ python3 chat_killer_server.py 127.0.0.1 25565
 HOST = "127.0.0.1" 
 MAXBYTES = 4096
 BEAT_TIMEOUT = 5
-BEAT_CHECK = 5
+BEAT_CHECK = 3
 
 
 def console(server):
@@ -30,20 +30,20 @@ def console(server):
     elif line[0] == '@':
         pseudo, command = line.split(1)[0]
         if pseudo in server.dicoPseudo.keys():
-            sock = server.dicoPseudo[pseudo]
-            if sock in server.socketList:
+            client = server.dicoPseudo[pseudo]
+            if client.socket in server.socketList:
                 pass
             else:
                 print(f"Le client {pseudo} n'est pas connecté.")
                 return
             
             if command == '!ban':
-                sock.send(str("!!BAN\n").encode())
-                server.disconnect_client(sock)
+                client.send(str("!!BAN\n").encode())
+                server.disconnect_client(client.sock)
             elif command == '!suspend':
-                sock.send(str("!!MUTE\n").encode())
+                client.send(str("!!MUTE\n").encode())
             elif command == '!forgive':
-                sock.send(str("!!UNMUTE\n").encode())
+                client.send(str("!!UNMUTE\n").encode())
             else:
                 print("Commande invalide")
 
@@ -56,17 +56,6 @@ def console(server):
         if line.split()[0] == 'wall':
             msg = str("server: " + line.split(' ', 1)[1]).encode()
             server.mess_all(msg)
-        elif line.split()[0] == 'kick':
-            pseudo = line.split()[1]
-            if pseudo in server.dicoClients.values():
-                for c in server.socketList:
-                    if c != server.socket and c != 0:
-                        if server.dicoClients[c][2] == pseudo:
-                            c.close()
-                            server.nb_clients -= 1
-                            print(f"Kicking {pseudo}...")
-            else:
-                print(f"Le pseudo {pseudo} n'existe pas.")
         else:
             print(line)
 
@@ -81,6 +70,9 @@ def message_client(sock, server):
         print("Erreur: ", e)
         server.disconnect_client(sock)
         return
+    
+    client = server.dicoClients[sock]
+
     if len(message) == 0:
         pass
     else:
@@ -88,32 +80,35 @@ def message_client(sock, server):
         if text[:2] == "!!":
             text = text[2:]
             if text == "BEAT":
-                server.dicoClients[sock] = (server.dicoClients[sock][0], server.dicoClients[sock][1], server.dicoClients[sock][2], server.dicoClients[sock][3], time.time())
-                sock.send(str("!!BEAT\n").encode())
+                client.last_beat = time.time()
+                client.send(str("!!BEAT\n").encode())
+
             elif text == "QUIT\n" or text == "quit\n":
                 server.disconnect_client(sock)
-                print(f"Client {server.dicoClients[sock][2]} disconnected")
+                print(f"Client {client.pseudo} disconnected")
+                server.mess_all(f"[-]{client.pseudo}!\n".encode())
+
             elif text[:8] == "message ":
                 text = text[8:]
-                if text == '!list\n':
-                    sock.send(server.get_list().encode())
 
-                elif text[0] == '@':
-                    if ' ' not in text:
+                if text[0] == '@': # whisper
+                    if not ' ' in text:
                         print("Erreur: message invalide")
-                    pseudo = text.split()[0][1:]
-                    _, message = text.split(' ', 1)
+                        return
+                    
+                    pseudo, message = text.split(' ', 1)
+                    pseudo = pseudo[1:]
 
                     if pseudo == 'admin':
-                        print("Message de " + server.dicoClients[sock][2] + " : " + message)
+                        print("Message de " + client.pseudo + " : " + message)
 
                     elif pseudo in server.dicoPseudo.keys():
                         server.dicoPseudo[pseudo].send(str(f"(wisper){server.dicoClients[sock][2]}: {message}").encode())
 
                     else:
-                        sock.send(str("Le pseudo n'existe pas\n").encode())
+                        client.send(str("Le pseudo n'existe pas\n").encode())
                 else:
-                    msg = str(f"{server.dicoClients[sock][2]}: {text}").encode()
+                    msg = str(f"{client.pseudo}: {text}").encode()
                     server.mess_all(msg)
             else:   
                 print("->>>>" + text)
@@ -121,11 +116,23 @@ def message_client(sock, server):
             text = text[1:]
             if text == "list\n":
                 msg = server.get_list() + '\n'
-                sock.send(msg.encode())
+                client.send(msg.encode())
             else:
                 print("-2>>>>" + text)
         else:
             print("---->" + text)
+
+class Client:
+    def __init__(self, address, socket, pseudo, cookie, last_beat) -> None:
+        self.address = address
+        self.socket = socket
+        self.pseudo = pseudo
+        self.cookie = cookie
+        self.last_beat = last_beat
+    
+    def send(self, msg):
+        self.socket.send(msg)
+
 
 class Server:
     def __init__(self, serversocket) -> None:
@@ -133,13 +140,24 @@ class Server:
         self.socket = serversocket
         self.socketList = [serversocket, 0] # liste des sockets à surveiller
         self.dicoPseudo = {} # dictionnaire Pseudo -> socket
-        self.dicoClients = {} # dictionnaire socket -> (address, socket, pseudo, cookie, last_beat)
+        self.dicoClients = {} # dictionnaire socket -> Client
+
+    def get_client(self, id):
+        """
+        Retourne le client associé au pseudo
+        """
+        if isinstance(id, socket.socket):
+            return self.dicoClients[id]
+        elif isinstance(id, str):
+            return self.dicoPseudo[id]
+        
+
 
     def get_list(self):
         txt = "Liste des clients :"
         for pseudo in self.dicoPseudo.keys():
             txt += '\n' + pseudo + '\t| '
-            if pseudo in self.socketList:
+            if self.dicoPseudo[pseudo].socket in self.socketList:
                 txt += "CONNECTED"
             else:
                 txt += "DISCONNECTED"
@@ -152,63 +170,69 @@ class Server:
         :server.socketList: liste des sockets à qui envoyer le message
         :sendersocket: socket qui a envoyé le message
         """
-        for c in self.socketList:
-            if c != self.socket and c != 0:
+        for sock in self.socketList:
+            if sock != self.socket and sock != 0:
                 try:
-                    c.send(msg)
+                    sock.send(msg)
                 except BrokenPipeError:
                     print("Erreur: client introuvable")
-                    self.disconnect_client(c)
+                    self.disconnect_client(sock)
                 except Exception as e:
                     print("Erreur: ", e)
     
-    def disconnect_client(self, c):  
+    def disconnect_client(self, sock):  
         """
         deconnecte un client
         ne supp pas des dico car le client peut se reconnecter
         :c: socket du client à déconnecter
         :server.socketList: liste des sockets à surveiller
         """
-        c.close()
-        self.socketList.remove(c)
+        sock.close()
+        self.socketList.remove(sock)
         self.nb_clients -= 1
     
     def new_client(self):
         (clientsocket, address) = self.socket.accept()
+        
         self.socketList.append(clientsocket)
         #! faire un select ppur eviter de bloquer
         txt = clientsocket.recv(MAXBYTES).decode()
-        pseudo = None
-        if txt[:8] == "!pseudo:":
+        
+        pseudo = "client" + str(self.nb_clients) #! a enlever-----------------------------------------------
+        
+        if txt[:8] == "!!cookie ":
+            cookie = txt.split()[1]
+            cookie = cookie[:-1] # on enleve le \n
+            for client in self.dicoClients.values():
+                if client.cookie == cookie: # on retrouve le client
+                    client.socket = clientsocket # on met à jour le socket
+                    return
+                
+
+        elif txt[:8] == "!!pseudo ":
             pseudo = txt.split()[1]
             if pseudo in self.dicoPseudo.keys():
                 clientsocket.send(str("!!wrong_pseudo\n").encode())
-                pass
-            else:
-                self.dicoPseudo[pseudo] = clientsocket
-                self.dicoClients[clientsocket] = (address, clientsocket, pseudo, time.time())
-                self.nb_clients += 1
-                print("New client connected")
-                self.mess_all(f"[+]{pseudo}!\n".encode())
+                return
+
+            cookie = str(random.randint(1000000, 9999999))
+            
+            client = Client(address, clientsocket, pseudo, cookie, time.time())
+
+            self.dicoPseudo[pseudo] = client
+            self.dicoClients[clientsocket] = client
+
+            self.nb_clients += 1
+
+            clientsocket.send(str(f"!!cookie:{cookie}\n").encode())
+
+            self.mess_all(f"[+]{pseudo}!\n".encode())
+            print("New client connected")
         
-        if txt[:8] == "!!cookie:":
-            cookie = txt.split()[1]
-            for key,val in self.dicoClients:
-                if cookie == val[3]:
-                    self.dicoClients[key] = (address, clientsocket, val[2], cookie[3], time.time())
-
-
-        cookie = str(random.randint(999999, 9999999)) + '\n'
-        ## recuperer le pseudo + gerer si le pseudo existe deja
-        pseudo = "client" + str(self.nb_clients)
-
-        self.dicoPseudo[pseudo] = clientsocket
-        self.dicoClients[clientsocket] = (address, clientsocket, pseudo, cookie, time.time())
-        self.nb_clients += 1
-        clientsocket.send(str(f"!!cookie:{cookie}\n").encode())
-
-        self.mess_all(f"[+]{pseudo}!\n".encode())
-        print("New client connected")
+        else:
+            self.disconnect_client(clientsocket)
+            print("Erreur: message invalide")
+            return
 
 def main():
     def alrm_handler(sig, frame):
@@ -216,11 +240,11 @@ def main():
         Verifie si tous les clients ont envoyé un beat
         """
         now = time.time()
-        for key in server.socketList:
-            if key != server.socket and key != 0:
-                if now - server.dicoClients[key][4] > BEAT_TIMEOUT:
-                    print("Client {} timeout".format(server.dicoClients[key][2]))
-                    server.disconnect_client(key)
+        for sock in server.socketList:
+            if sock != server.socket and sock != 0:
+                if now - server.dicoClients[sock].last_beat > BEAT_TIMEOUT:
+                    print("Client {} timeout".format(server.dicoClients[sock].pseudo))
+                    server.disconnect_client(sock)
         signal.alarm(BEAT_CHECK) # on remet l'alarme
 
     try:
@@ -234,28 +258,27 @@ def main():
         print("Error: ", e)
         sys.exit(1)
     #! pas sur de ces exceptions
+
     signal.signal(signal.SIGALRM, alrm_handler)
-
     server = Server(serversocket)
-
 
     first = True
     signal.alarm(BEAT_CHECK) # 5 secondes pour envoyer un beat
+    
     print("Server started")
     while server.nb_clients > 0 or first:
         first = False
-        # try:
-        # print(server.socketList)
-        (activesockets, _, _) = select.select(server.socketList, [], []) 
+        try:
+            (activesockets, _, _) = select.select(server.socketList, [], []) 
 
-        # except Exception as e:
-        #     print("Erreur: ", e)
-        #     sys.exit(1)
+        except Exception as e:
+            print("Erreur: ", e)
+            sys.exit(1)
         #! gerer les exceptions
 
         for sock in activesockets:
             if not sock in server.socketList:
-                # print("Erreur: socket introuvable")
+                print("Erreur: socket introuvable")
                 continue
 
             if sock == serversocket:
