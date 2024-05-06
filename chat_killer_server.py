@@ -47,10 +47,11 @@ def new_client(server):
     server.socketList.append(clientsocket)
     #! faire un select ppur eviter de bloquer
     txt = clientsocket.recv(MAXBYTES).decode()
+    pseudo = None
     if txt[:8] == "!pseudo:":
         pseudo = txt.split()[1]
         if pseudo in server.dicoPseudo.keys():
-            # le pseudo existe deja donc 
+            clientsocket.send(str("!!wrong_pseudo\n").encode())
             pass
         else:
             server.dicoPseudo[pseudo] = clientsocket
@@ -66,7 +67,7 @@ def new_client(server):
                 server.dicoClients[key] = (address, clientsocket, val[2], cookie[3], time.time())
 
 
-    cookie = str(random.randint(999999, 9999999))
+    cookie = str(random.randint(999999, 9999999)) + '\n'
     ## recuperer le pseudo gerer si le pseudo existe deja
     pseudo = "client" + str(server.nb_clients)
 
@@ -80,7 +81,6 @@ def new_client(server):
 
 
 def console(server):
-    global nb_clients
     line = os.read(0, MAXBYTES).decode()
     if line[0] == '!':
         if line == "!quit\n":
@@ -89,7 +89,7 @@ def console(server):
                 if c != server.socket and c != 0:
                     c.close()
 
-                    nb_clients -= 1
+                    server.nb_clients -= 1
             server.socket.close()
             
     else:
@@ -103,7 +103,7 @@ def console(server):
                     if c != server.socket and c != 0:
                         if server.dicoClients[c][2] == pseudo:
                             c.close()
-                            nb_clients -= 1
+                            server.nb_clients -= 1
                             print(f"Kicking {pseudo}...")
             else:
                 print(f"Le pseudo {pseudo} n'existe pas.")
@@ -125,6 +125,7 @@ def message_client(sock, server):
             text = text[2:]
             if text == "BEAT\n":
                 server.dicoClients[sock] = (server.dicoClients[sock][0], server.dicoClients[sock][1], server.dicoClients[sock][2], server.dicoClients[sock][3], time.time())
+                sock.send(str("!!BEAT\n").encode())
             elif text == "QUIT\n" or text == "quit\n":
                 disconnect_client(sock, server)
                 print(f"Client {server.dicoClients[sock][2]} disconnected")
@@ -239,7 +240,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     PORT = int(sys.argv[1])
-    nb_clients = 0
+    
     
     main()
 
