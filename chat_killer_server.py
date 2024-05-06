@@ -115,7 +115,12 @@ def message_client(sock, server):
     """
     Fonction qui traite les messages des clients
     """
-    message = sock.recv(MAXBYTES)
+    try:
+        message = sock.recv(MAXBYTES)
+    except OSError as e:
+        print("Erreur: ", e)
+        disconnect_client(sock, server)
+        return
     if len(message) == 0:
         # run = False
         pass
@@ -123,21 +128,33 @@ def message_client(sock, server):
         text = message.decode()
         if text[:2] == "!!":
             text = text[2:]
-            if text == "BEAT\n":
+            if text == "BEAT":
+                # print(f"Client {server.dicoClients[sock][2]} sent a beat")
                 server.dicoClients[sock] = (server.dicoClients[sock][0], server.dicoClients[sock][1], server.dicoClients[sock][2], server.dicoClients[sock][3], time.time())
                 sock.send(str("!!BEAT\n").encode())
             elif text == "QUIT\n" or text == "quit\n":
                 disconnect_client(sock, server)
                 print(f"Client {server.dicoClients[sock][2]} disconnected")
-            elif text[:8] == "!!message ":
+            elif text[:8] == "message ":
                 text = text[8:]
                 if text[0] == '@':
+                    if ' ' not in text:
+                        print("Erreur: message invalide")
                     pseudo = text.split()[0][1:]
-                    pseudo, message = text.split(' ', 1)
+                    print(pseudo)
+                    _, message = text.split(' ', 1)
                     if pseudo in server.dicoPseudo.keys():
-                        server.dicoPseudo[pseudo].send(str(f"{server.dicoClients[sock][2]}: {message}").encode())
+                        server.dicoPseudo[pseudo].send(str(f"(wisper){server.dicoClients[sock][2]}: {message}").encode())
                     else:
                         print(f"Le pseudo {pseudo} n'existe pas.")
+                else:
+                    msg = str(f"{server.dicoClients[sock][2]}: {text}").encode()
+                    mess_all(server, msg)
+            else:   
+                print("->>>>" + text)
+        else:
+            print("---->" + text)
+
             # if text.split()[0] == "!!cookie:":
             #     cookie = text.split()[1]
             #     for key,val in server.dicoClients:
@@ -213,14 +230,19 @@ def main():
     while server.nb_clients > 0 or first:
         first = False
         # try:
-        print(server.socketList)
+        # print(server.socketList)
         (activesockets, _, _) = select.select(server.socketList, [], []) 
+
         # except Exception as e:
         #     print("Erreur: ", e)
         #     sys.exit(1)
         #! gerer les exceptions
 
         for sock in activesockets:
+            if not sock in server.socketList:
+                # print("Erreur: socket introuvable")
+                continue
+
             if sock == serversocket:
                 new_client(server)
             
@@ -228,7 +250,7 @@ def main():
                 console(server)
 
             else:
-                message_client(sock, server.dicoClients)
+                message_client(sock, server)
                 # message_client(sock, server.socketList, server.dicoClients, server.dicoPseudo)
                 
 

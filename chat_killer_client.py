@@ -42,8 +42,8 @@ def server_connection():
 			
 			os.write(fd,cookie.encode())
 			os.close(fd)
-		#signal.signal(signal.SIGALRM, alarm_hdler())
-		#signal.alarm(1)
+		signal.signal(signal.SIGALRM, alarm_hdler)
+		signal.alarm(1)
 		print('connected to:', sockaddr)
 		socketlist = [server]
 		return True,socketlist,server
@@ -118,7 +118,7 @@ def lancement_client(run,socketlist,server):
 							else:
 								os.write(log,"commande inconnue\n".encode('utf-8'))
 						else:
-							#line=("!!message"+line.decode()).encode()
+							line=("!!message "+line.decode()).encode()
 							server.send(line)
 					else:
 						data = server.recv(MAXBYTES)
