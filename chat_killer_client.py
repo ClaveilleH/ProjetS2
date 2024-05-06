@@ -8,13 +8,14 @@
 
 import os, socket, sys, select, time,signal
 
-'''
+
 def alarm_hdler(sig_num,frame):
+	global server
 	msg="!!BEAT"
 	print(msg)
 	server.send(msg.encode('utf-8'))
 	signal.alarm(3)
-'''	
+	
 
 
 	
@@ -22,7 +23,7 @@ def server_connection():
 	HOST = sys.argv[1]
 	PORT = int(sys.argv[2])
 	sockaddr = (HOST, PORT)
-
+	global server
 	try:
 		server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4, TCP
 		server.connect(sockaddr)
@@ -41,7 +42,7 @@ def server_connection():
 			
 			os.write(fd,cookie.encode())
 			os.close(fd)
-		#signal.signal(signal.SIGALRM, alarm_hdler(server))
+		#signal.signal(signal.SIGALRM, alarm_hdler())
 		#signal.alarm(1)
 		print('connected to:', sockaddr)
 		socketlist = [server]
