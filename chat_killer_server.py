@@ -117,6 +117,13 @@ def message_client(sock, server):
                     server.mess_all(msg)
             else:   
                 print("->>>>" + text)
+        elif text[0] == '!':
+            text = text[1:]
+            if text == "list\n":
+                msg = server.get_list() + '\n'
+                sock.send(msg.encode())
+            else:
+                print("-2>>>>" + text)
         else:
             print("---->" + text)
 
