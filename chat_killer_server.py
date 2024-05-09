@@ -186,6 +186,13 @@ class Server:
 		os.close(file)
 		print("Sauvegarde terminée")
 
+		liste = self.socketList.copy()
+
+		try: # netoyage de la liste, pas l'ideal mais pas le temps de faire mieux
+			self.socketList = list(set(self.socketList))
+		except:
+			self.socketList = liste
+
 
 
 
@@ -298,6 +305,7 @@ def main():
 		"""
 		Verifie si tous les clients ont envoyé un beat
 		"""
+		global BEAT_CPT
 		now = time.time()
 		for sock in server.socketList:
 			if sock != server.socket and sock != 0:
@@ -307,6 +315,7 @@ def main():
 		signal.alarm(BEAT_CHECK) # on remet l'alarme
 		if BEAT_CPT % 20 == 0: # on sauvegarde tous les 20 beats (1 minute)
 			server.backup()
+		BEAT_CPT += 1
 
 	try:
 		serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # IPv4, TCP
