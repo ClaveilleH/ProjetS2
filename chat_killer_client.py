@@ -9,7 +9,7 @@
 import os, socket, sys, select, time,signal
 
 
-def alarm_hdler(sig_num,frame): 
+def alarm_hdler(sig_num,frame): #Handler qui gère le heartbeat. Il envoie un "!!BEAT" au server toutes les secondes
 	global server
 	global server_statut
 	msg="!!BEAT"
@@ -23,17 +23,20 @@ def alarm_hdler(sig_num,frame):
 
 
 	
-def server_connection():
+def server_connection(): #Protocole de gestion des connexions client-server
 	HOST = "127.0.0.1"
 	PORT = 2000
 	sockaddr = (HOST, PORT)
 	global server
 	global server_statut
+	global COOKIE
+	if (os.path.exists(pathcookie)):
+		COOKIE = True
 	try:
 		server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4, TCP
 		server.connect(sockaddr)
 		if COOKIE :							#Protocole de reconnection si présence de cookie
-			fd = os.open("/tmp/"+pseudo+".cookie", os.O_RDONLY)
+			fd = os.open(pathcookie, os.O_RDONLY)
 			fdr=os.read(fd,MAXBYTES).decode()
 			print("Envoie du cookie au server... ")
 			server.send(str('!!cookie '+fdr).encode())
@@ -59,7 +62,7 @@ def server_connection():
 
 
 
-def help(fd):
+def help(fd): #Affichage des commandes en ligne
     os.write(fd,"liste des commandes: \n".encode('utf-8'))
     os.write(fd,"	!quit pour quitter \n".encode('utf-8'))
     os.write(fd,"	!list pour lister les utilisateurs \n".encode('utf-8'))
@@ -67,9 +70,9 @@ def help(fd):
     os.write(fd,"	@pseudo message pour envoyer un message privé à :pseudo: \n".encode('utf-8'))
     os.write(fd,"	message pour envoyer un message public \n".encode('utf-8'))
     
-def help_offline(fd):
+def help_offline(fd):#Affichage des commandes hors ligne
 	os.write(fd,"Vous n'êtes plus connecté au server \n\n".encode('utf-8'))
-	os.write(fd,"Voici la liste des commandes hors-ligne: \n".encode('utf-8'))
+	os.write(fd,"Voici la liste des commandes hors ligne: \n".encode('utf-8'))
 	os.write(fd,"	!quit pour fermer le client \n".encode('utf-8'))
 	os.write(fd,"	!help pour afficher la liste des commandes \n".encode('utf-8'))
 	os.write(fd,"	!reconnect pour essayer de vous reconnecter au server\n".encode('utf-8'))
@@ -96,7 +99,7 @@ def term_affichage():	#tant que run == True, fermer un term le relance tout de s
 			os.wait()
 
 
-def lancement_client(run,socketlist,server):
+def lancement_client(run,socketlist,server): #Protocol de communication client-server
 	os.mkfifo(pathfifo) #tube nommé pour communication entre terminal de saisie et superviseur
 	pid = os.fork()
 	quit = False
@@ -177,6 +180,7 @@ def lancement_client(run,socketlist,server):
 			os.close(log)
 			os.system("rm "+pathfifo)
 			os.system("rm "+pathlog)
+			os.system("rm "+pathcookie)
 			os.system("pkill xterm") #ferme tous les processus xterm
 			sys.exit(0)
 
@@ -189,8 +193,7 @@ if __name__ == "__main__":
 	pseudo = input("Entrez votre identifiant: ")
 	pathfifo = "/tmp/"+pseudo+".fifo"
 	pathlog = "/tmp/"+pseudo+".log"
+	pathcookie="/tmp/"+pseudo+".cookie"
 	MAXBYTES = 4096
 	COOKIE = False
-	if (os.path.exists("/tmp/"+pseudo+".cookie")):
-		COOKIE = True
 	main()
