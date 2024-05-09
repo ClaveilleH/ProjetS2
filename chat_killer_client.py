@@ -18,9 +18,11 @@ def alarm_hdler(sig_num,frame): #Handler qui gère le heartbeat. Il envoie un "!
 		server_statut= True
 		signal.alarm(1)
 	except :
-		server_statut = False
+		erreur_rep_server()
 	
-
+def erreur_rep_server():
+	global server_statut
+	server_statut = False
 
 	
 def server_connection(): #Protocole de gestion des connexions client-server
@@ -30,6 +32,7 @@ def server_connection(): #Protocole de gestion des connexions client-server
 	global server
 	global server_statut
 	global COOKIE
+	global run
 	if (os.path.exists(pathcookie)):
 		COOKIE = True
 	try:
@@ -39,23 +42,38 @@ def server_connection(): #Protocole de gestion des connexions client-server
 			fd = os.open(pathcookie, os.O_RDONLY)
 			fdr=os.read(fd,MAXBYTES).decode()
 			print("Envoie du cookie au server... ")
-			server.send(str('!!cookie '+fdr).encode())
+			try :
+				server.send(str('!!cookie '+fdr).encode())
+			except :
+				if run:
+					erreur_rep_server()
+				else :
+					print("Erreur: envoie au server")
+					sys.exit(1)
 			os.close(fd)
 		else :								#Protocole de premiere connection
-			server.send(str('!!pseudo ' + pseudo).encode())
-			fd=os.open("/tmp/"+pseudo+".cookie", os.O_WRONLY|os.O_CREAT)
-			print("En attente de reception de cookie... ")
-			cookie=server.recv(MAXBYTES).decode('utf-8')
-			print(cookie)
-			cookie = cookie.split()[1]
-			os.write(fd,cookie.encode())
-			os.close(fd)
+			try :
+				server.send(str('!!pseudo ' + pseudo).encode())
+				fd=os.open("/tmp/"+pseudo+".cookie", os.O_WRONLY|os.O_CREAT)
+				print("En attente de reception de cookie... ")
+				cookie=server.recv(2048).decode('utf-8')
+				print(cookie)
+				cookie = cookie.split()[1]
+				os.write(fd,cookie.encode())
+				os.close(fd)
+			except:
+				if run:
+					erreur_rep_server()
+				else :
+					print("Erreur: envoie au server")
+					sys.exit(1)
 		signal.signal(signal.SIGALRM, alarm_hdler) #Setup le HEARTBEAT
 		signal.alarm(1)
 		print('connected to:', sockaddr)
 		socketlist = [server]
 		server_statut = True
-		return True,socketlist,server
+		run = True
+		return socketlist,server
 	except socket.error as e:
 		print('erreur connexion:', e)
 		sys.exit(1)
@@ -99,7 +117,7 @@ def term_affichage():	#tant que run == True, fermer un term le relance tout de s
 			os.wait()
 
 
-def lancement_client(run,socketlist,server): #Protocol de communication client-server
+def lancement_client(socketlist,server): #Protocol de communication client-server
 	if not (os.path.exists(pathfifo)):
 		os.mkfifo(pathfifo) #tube nommé pour communication entre terminal de saisie et superviseur
 	pid = os.fork()
@@ -115,12 +133,12 @@ def lancement_client(run,socketlist,server): #Protocol de communication client-s
 			term_affichage()
 		else:
 			global server_statut
+			global run
 			help(log)
 			while run :
 				while server_statut :
 					(activesockets, _, _) = select.select(socketlist, [], [])
 					for s in activesockets:
-						
 						if s == fifo:
 							line = os.read(fifo, MAXBYTES)
 							lineD = line.decode()
@@ -136,14 +154,20 @@ def lancement_client(run,socketlist,server): #Protocol de communication client-s
 									os.kill(pid2,signal.SIGQUIT)
 									break
 								elif lineD == "!list\n":
-									server.send(line)
+									try:
+										server.send(line)
+									except:
+										erreur_rep_server()
 								elif lineD == "!help\n":
 									help(log)
 								else:
 									os.write(log,"commande inconnue\n".encode('utf-8'))
 							else:
 								line=("!!message "+line.decode()).encode()
-								server.send(line)
+								try:
+									server.send(line)
+								except:
+									erreur_rep_server()
 						else:
 							data = server.recv(MAXBYTES)
 							if len(data) == 0:
@@ -172,7 +196,7 @@ def lancement_client(run,socketlist,server): #Protocol de communication client-s
 						elif lineD == "!help\n":
 							help_offline(log)
 						elif lineD == "!reconnect\n":
-							run,socketlist,server=server_connection()
+							socketlist,server=server_connection()
 							offline = False
 							socketlist.append(fifo)
 							
@@ -187,8 +211,8 @@ def lancement_client(run,socketlist,server): #Protocol de communication client-s
 			sys.exit(0)
 
 def main():
-	run,socketlist,servert=server_connection()
-	lancement_client(run,socketlist,server)
+	socketlist,servert=server_connection()
+	lancement_client(socketlist,server)
 
 	
 if __name__ == "__main__":
@@ -197,5 +221,6 @@ if __name__ == "__main__":
 	pathlog = "/tmp/"+pseudo+".log"
 	pathcookie="/tmp/"+pseudo+".cookie"
 	MAXBYTES = 4096
+	run = False
 	COOKIE = False
 	main()
