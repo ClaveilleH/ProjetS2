@@ -146,6 +146,10 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 								continue
 							elif lineD[0] == '!':
 								if lineD == "!quit\n":
+									try:
+										server.send("!!quit".encode())
+									else:
+										pass
 									server.close()
 									run = False
 									server_statut = False
