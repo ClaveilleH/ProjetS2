@@ -3,7 +3,7 @@
 #TODO(done) : Recevoir cookie (avec select) 
 #TODO(done) : Encapsulation des saisies client (!!message messageduclient)
 #TODO(done) : Tolérance aux pannes des terminaux qui exécutent les commandes tail -f LOG et cat > TUBE, relance des terminaux et des commandes : 16/20
-#TODO(done) :Tolérances aux pannes de serveur (détection par échec d'envoi de message au serveur), commande !reconnect : 19/20
+#TODO :Tolérances aux pannes de serveur (détection par échec d'envoi de message au serveur), commande !reconnect : 19/20
 
 
 import os, socket, sys, select, time,signal
@@ -100,7 +100,8 @@ def term_affichage():	#tant que run == True, fermer un term le relance tout de s
 
 
 def lancement_client(run,socketlist,server): #Protocol de communication client-server
-	os.mkfifo(pathfifo) #tube nommé pour communication entre terminal de saisie et superviseur
+	if not (os.path.exists(pathfifo)):
+		os.mkfifo(pathfifo) #tube nommé pour communication entre terminal de saisie et superviseur
 	pid = os.fork()
 	quit = False
 	if pid == 0:
