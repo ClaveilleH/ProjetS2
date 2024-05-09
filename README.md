@@ -24,6 +24,9 @@ Points amélioré depuis la démo :	- La commande !reconnect fonctionne
 
 Auto-évaluation : 20/20
 
-Commentaires(CLIENT) :	- les pseudos fonctionnent comme des identifiants : afin de gérer les cookies de plusieurs clients sur une seule machine, le fichier est "pseudo.cookie". Pour vous reconnecter après un crash, il faut rentrer le meme pseudo.
-				- !quit est une déconnexion "propre" qui supprime pseudo.fifo, pseudo.log, pseudo.cookie
-				- si il y a un crash server et que le client quitte en etant hors-ligne, le server peut crash si le client tente de se reconnecter avec le meme pseudo.
+Commentaires(CLIENT) :	
+- les pseudos fonctionnent comme des identifiants : afin de gérer les cookies de plusieurs clients sur une seule machine, le fichier est "pseudo.cookie". Pour vous reconnecter après un crash, il faut rentrer le meme pseudo.
+
+- !quit est une déconnexion "propre" qui supprime pseudo.fifo, pseudo.log, pseudo.cookie
+
+- si il y a un crash server et que le client quitte en etant hors-ligne, le server peut crash si le client tente de se reconnecter avec le meme pseudo.
