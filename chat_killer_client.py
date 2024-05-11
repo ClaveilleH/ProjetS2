@@ -1,12 +1,4 @@
-#TODO(done) : ALARM MSG !!BEAT au serv ;
-#TODO(done) : soit !!cookie soit !!pseudo pour gerer les crashs
-#TODO(done) : Recevoir cookie (avec select) 
-#TODO(done) : Encapsulation des saisies client (!!message messageduclient)
-#TODO(done) : Tolérance aux pannes des terminaux qui exécutent les commandes tail -f LOG et cat > TUBE, relance des terminaux et des commandes : 16/20
-#TODO :Tolérances aux pannes de serveur (détection par échec d'envoi de message au serveur), commande !reconnect : 19/20
-
-
-import os, socket, sys, select, time,signal
+import os, socket, sys, select,signal
 
 
 def alarm_hdler(sig_num,frame): #Handler qui gère le heartbeat. Il envoie un "!!BEAT" au server toutes les secondes
@@ -36,6 +28,7 @@ def server_connection(): #Protocole de gestion des connexions client-server
 	global server_statut
 	global COOKIE
 	global run
+	global quit
 	if (os.path.exists(pathcookie)):
 		COOKIE = True
 	try:
@@ -60,7 +53,6 @@ def server_connection(): #Protocole de gestion des connexions client-server
 				fd=os.open("/tmp/"+pseudo+".cookie", os.O_WRONLY|os.O_CREAT)
 				print("En attente de reception de cookie... ")
 				cookie=server.recv(2048).decode('utf-8')
-				print(cookie)
 				cookie = cookie.split()[1]
 				os.write(fd,cookie.encode())
 				os.close(fd)
@@ -80,6 +72,9 @@ def server_connection(): #Protocole de gestion des connexions client-server
 	except socket.error as e:
 		print('erreur connexion:', e)
 		sys.exit(1)
+	except OSError as e :
+		print('Erreur :'+e)
+		quit = True
 
 
 
@@ -109,6 +104,9 @@ def term_saisie():    #tant que run == True, fermer un term le relance tout de s
 				os.execvp("xterm",argv) #lance le terminal ou entree standard > fifo
 			else :
 				os.wait()
+	except OSError as e: 
+		print("Erreur :"+e)
+		quit = True
 	except :
 		quit = True
 			
@@ -124,7 +122,10 @@ def term_affichage():	#tant que run == True, fermer un term le relance tout de s
 				os.execvp("xterm",argv1)
 			else :
 				os.wait()
-	except : 
+	except OSError as e: 
+		print("Erreur :"+e)
+		quit = True
+	except :
 		quit = True
 
 def quitter(p1,p2):
@@ -241,8 +242,8 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 					os.system("rm "+pathcookie)
 					os.system("pkill xterm") #ferme tous les processus xterm
 					sys.exit(0)
-	except :
-		print("Erreure : os.fork()")
+	except OSError as e:
+		print("Erreure :"+e)
 		sys.exit(0)
 
 def main():
