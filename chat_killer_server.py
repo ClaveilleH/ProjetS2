@@ -171,7 +171,7 @@ class Server:
 					self.dicoClients[address] = client
 					# self.socketList.append(client.socket) # on ne peut pas ajouter le socket car il n'est pas encore reconnecté
 					self.nb_clients += 1
-					
+
 			print("Chargement terminé")
 				
 	def backup(self):
@@ -281,6 +281,8 @@ class Server:
 			pseudo = txt.split()[1]
 			if pseudo in self.dicoPseudo.keys():
 				clientsocket.send(str("!!wrong_pseudo\n").encode())
+				clientsocket.close()
+				self.socketList.remove(clientsocket)
 				return
 
 			cookie = str(random.randint(1000000, 9999999))
