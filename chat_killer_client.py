@@ -197,13 +197,13 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 									# run = False
 									continue
 								elif data.decode() != "!!BAN\n":
-									os.write(log,"Vous avez été bannis\nVous allez être déconnecté...")
+									os.write(log,"Vous avez été bannis\nVous allez être déconnecté...".encode())
 									quit = True
 								elif data.decode() != "!!MUTE\n":
-									os.write(log,"Un modérateur vous a mute.\nVous ne pouvez plus écrire dans le chat...")
+									os.write(log,"Un modérateur vous a mute.\nVous ne pouvez plus écrire dans le chat...".encode())
 									os.close(fifo)
 								elif data.decode() != "!!UNMUTE\n":
-									os.write(log,"vous avez été pardonné, vous avez de nouveau droit a écrir dans le chat !")
+									os.write(log,"vous avez été pardonné, vous avez de nouveau droit a écrir dans le chat !".encode())
 									fifo =os.open(pathfifo,os.O_RDONLY|os.O_TRUNC)
 								elif data.decode() != "!!BEAT\n":
 									os.write(log, data)
