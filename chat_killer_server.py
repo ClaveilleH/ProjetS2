@@ -124,7 +124,9 @@ def message_client(sock, server):
 						print("Message de " + client.pseudo + " : " + message)
 
 					elif pseudo in server.dicoPseudo.keys():
-						server.dicoPseudo[pseudo].send(str(f"(wisper){server.dicoClients[sock].pseudo}: {message}").encode())
+						dest = server.dicoPseudo[pseudo]
+						dest.send(str(f"(wisper){server.dicoClients[sock].pseudo}: {message}").encode())
+						client.send(str(f"wisper to {dest.pseudo}: {message}").encode())
 
 					else:
 						client.send(str("Le pseudo n'existe pas\n").encode())
@@ -323,7 +325,9 @@ class Server:
 			clientsocket.send(str(f"!!cookie {cookie}\n").encode())
 			print("New client connected")
 			self.mess_all(f"[+]{pseudo}\n".encode())
-		
+
+			clientsocket.send(str(f"!!message Vous etes connecte au serveur\n").encode())
+
 		else:
 			self.disconnect_client(clientsocket)
 			print("Erreur: message invalide")
