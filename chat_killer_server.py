@@ -111,7 +111,7 @@ def message_client(sock, server):
 						print("Message de " + client.pseudo + " : " + message)
 
 					elif pseudo in server.dicoPseudo.keys():
-						server.dicoPseudo[pseudo].send(str(f"(wisper){server.dicoClients[sock][2]}: {message}").encode())
+						server.dicoPseudo[pseudo].send(str(f"(wisper){server.dicoClients[sock].pseudo}: {message}").encode())
 
 					else:
 						client.send(str("Le pseudo n'existe pas\n").encode())
