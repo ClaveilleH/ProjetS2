@@ -1,5 +1,7 @@
 # ProjetS2
 
+URL du repo : https://github.com/ClaveilleH/ProjetS2
+
 Partie Client : Vincent AUGER 22102678
 
 Points amélioré depuis la démo :	- La commande !reconnect fonctionne
