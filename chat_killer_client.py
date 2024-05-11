@@ -28,7 +28,7 @@ def erreur_rep_server():
 def server_connection(): #Protocole de gestion des connexions client-server
 	HOST = "127.0.0.1"
 	if len(sys.argv)>1:
-		PORT = sys.argv[1]
+		PORT = int(sys.argv[1])
 	else :
 		PORT = 25565
 	sockaddr = (HOST, PORT)
@@ -135,111 +135,115 @@ def quitter(p1,p2):
 def lancement_client(socketlist,server): #Protocol de communication client-server
 	if not (os.path.exists(pathfifo)):
 		os.mkfifo(pathfifo) #tube nommé pour communication entre terminal de saisie et superviseur
-	pid = os.fork()
-	if pid == 0:
-		term_saisie()
-	else :
-		fifo=os.open(pathfifo,os.O_RDONLY) #descripteur de fichier fifo readonly
-		socketlist.append(fifo)
-		log=os.open(pathlog, os.O_APPEND|os.O_TRUNC|os.O_CREAT|os.O_WRONLY) #descripteur de fichier log append, create if not exist, supprime le contenu à l'ouverture
-		pid2= os.fork()
-		if pid2== 0:
-			term_affichage()
-		else:
-			global server_statut
-			global run
-			global quit
-			cleanquit = False
-			quit = False
-			help(log)
-			while run and not(quit): #Boucle du client
-				while server_statut : #Boucle client en ligne
-					(activesockets, _, _) = select.select(socketlist, [], [])
-					for s in activesockets:
-						if s == fifo:
-							line = os.read(fifo, MAXBYTES)
-							lineD = line.decode()
-							if len(line)==0:
-								continue
-							elif lineD[0] == '!':
-								if lineD == "!quit\n":
-									try:
-										server.send("!!quit".encode())
+	try :
+		pid = os.fork()
+		if pid == 0:
+			term_saisie()
+		else :
+			fifo=os.open(pathfifo,os.O_RDONLY) #descripteur de fichier fifo readonly
+			socketlist.append(fifo)
+			log=os.open(pathlog, os.O_APPEND|os.O_TRUNC|os.O_CREAT|os.O_WRONLY) #descripteur de fichier log append, create if not exist, supprime le contenu à l'ouverture
+			pid2= os.fork()
+			if pid2== 0:
+				term_affichage()
+			else:
+				global server_statut
+				global run
+				global quit
+				cleanquit = False
+				quit = False
+				help(log)
+				while run and not(quit): #Boucle du client
+					while server_statut : #Boucle client en ligne
+						(activesockets, _, _) = select.select(socketlist, [], [])
+						for s in activesockets:
+							if s == fifo:
+								line = os.read(fifo, MAXBYTES)
+								lineD = line.decode()
+								if len(line)==0:
+									continue
+								elif lineD[0] == '!':
+									if lineD == "!quit\n":
+										try:
+											server.send("!!quit".encode())
+										except:
+											pass
+										server.close()
+										run = False
+										server_statut = False
+										quit = True
+										cleanquit=True
+										quitter(pid,pid2)
+										break
+									elif lineD == "!list\n":
+										try:
+											server.send(line)
+										except:
+											erreur_rep_server()
+									elif lineD == "!help\n":
+										help(log)
 									else:
-										pass
-									server.close()
-									run = False
-									server_statut = False
-									quit = True
-									cleanquit=True
-									quitter(pid1,pid2)
-									break
-								elif lineD == "!list\n":
+										os.write(log,"commande inconnue\n".encode('utf-8'))
+								else:
+									line=("!!message "+line.decode()).encode()
 									try:
 										server.send(line)
 									except:
 										erreur_rep_server()
-								elif lineD == "!help\n":
-									help(log)
-								else:
-									os.write(log,"commande inconnue\n".encode('utf-8'))
 							else:
-								line=("!!message "+line.decode()).encode()
-								try:
-									server.send(line)
-								except:
-									erreur_rep_server()
-						else:
-							data = server.recv(MAXBYTES)
-							if len(data) == 0:
-								# run = False
-								continue
-							elif data.decode() != "!!BEAT\n":
-								os.write(log, data)
+								data = server.recv(MAXBYTES)
+								if len(data) == 0:
+									# run = False
+									continue
+								elif data.decode() != "!!BEAT\n":
+									os.write(log, data)
+									
+					help_offline(log)
+					offline = True
+					
+					while offline and not(quit): #boucle client hors-ligne
+						line = os.read(fifo, MAXBYTES)
+						lineD = line.decode()
+						if len(line)==0:
+							continue
+						elif lineD[0] == '!':
+							if lineD == "!quit\n":
+								server.close()
+								run = False
+								server_statut = False
+								quit = True
+								cleanquit=True
+								quitter(pid,pid2)
+								break
+							elif lineD == "!help\n":
+								help_offline(log)
+							elif lineD == "!reconnect\n":
+								socketlist,server=server_connection()
+								offline = False
+								socketlist.append(fifo)
 								
-				help_offline(log)
-				offline = True
-				
-				while offline and not(quit): #boucle client hors-ligne
-					line = os.read(fifo, MAXBYTES)
-					lineD = line.decode()
-					if len(line)==0:
-						continue
-					elif lineD[0] == '!':
-						if lineD == "!quit\n":
-							server.close()
-							run = False
-							server_statut = False
-							quit = True
-							cleanquit=True
-							quitter(pid1,pid2)
-							break
-						elif lineD == "!help\n":
-							help_offline(log)
-						elif lineD == "!reconnect\n":
-							socketlist,server=server_connection()
-							offline = False
-							socketlist.append(fifo)
-							
-						else:
-							os.write(log,"commande inconnue\n".encode('utf-8'))
-			if cleanquit : #Fermeture !quit
-				os.close(fifo)
-				os.close(log)
-				os.system("rm "+pathfifo)
-				os.system("rm "+pathlog)
-				os.system("rm "+pathcookie)
-				os.system("pkill xterm") #ferme tous les processus xterm
-				sys.exit(0)
-			else :	#Fermeture car terminal cassé
-				quitter(pid1,pid2)
-				os.close(fifo)
-				os.close(log)
-				os.system("rm "+pathfifo)
-				os.system("rm "+pathlog)
-				os.system("rm "+pathcookie)
-				os.system("pkill xterm") #ferme tous les processus xterm
-				sys.exit(0)
+							else:
+								os.write(log,"commande inconnue\n".encode('utf-8'))
+				if cleanquit : #Fermeture !quit
+					os.close(fifo)
+					os.close(log)
+					os.system("rm "+pathfifo)
+					os.system("rm "+pathlog)
+					os.system("rm "+pathcookie)
+					os.system("pkill xterm") #ferme tous les processus xterm
+					sys.exit(0)
+				else :	#Fermeture car terminal cassé
+					quitter(pid,pid2)
+					os.close(fifo)
+					os.close(log)
+					os.system("rm "+pathfifo)
+					os.system("rm "+pathlog)
+					os.system("rm "+pathcookie)
+					os.system("pkill xterm") #ferme tous les processus xterm
+					sys.exit(0)
+	except :
+		print("Erreure : os.fork()")
+		sys.exit(0)
 
 def main():
 	socketlist,servert=server_connection()
