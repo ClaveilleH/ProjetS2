@@ -1,4 +1,4 @@
-import os, socket, sys, select,signal
+import os, socket, sys, select,signal,time
 
 
 def alarm_hdler(sig_num,frame): #Handler qui gère le heartbeat. Il envoie un "!!BEAT" au server toutes les secondes
@@ -73,7 +73,7 @@ def server_connection(): #Protocole de gestion des connexions client-server
 		print('erreur connexion:', e)
 		sys.exit(1)
 	except OSError as e :
-		print('Erreur :'+e)
+		print('Erreur :',e)
 		quit = True
 
 
@@ -105,7 +105,7 @@ def term_saisie():    #tant que run == True, fermer un term le relance tout de s
 			else :
 				os.wait()
 	except OSError as e: 
-		print("Erreur :"+e)
+		print("Erreur :",e)
 		quit = True
 	except :
 		quit = True
@@ -123,7 +123,7 @@ def term_affichage():	#tant que run == True, fermer un term le relance tout de s
 			else :
 				os.wait()
 	except OSError as e: 
-		print("Erreur :"+e)
+		print("Erreur :",e)
 		quit = True
 	except :
 		quit = True
@@ -153,6 +153,7 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 				global quit
 				cleanquit = False
 				quit = False
+				mute = False
 				help(log)
 				while run and not(quit): #Boucle du client
 					while server_statut : #Boucle client en ligne
@@ -186,25 +187,29 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 									else:
 										os.write(log,"commande inconnue\n".encode('utf-8'))
 								else:
-									line=("!!message "+line.decode()).encode()
-									try:
-										server.send(line)
-									except:
-										erreur_rep_server()
+									if not(mute):
+										line=("!!message "+line.decode()).encode()
+										try:
+											server.send(line)
+										except:
+											erreur_rep_server()
+									else :
+										os.write(log,"Vous êtes mute ...\n".encode())
 							else:
 								data = server.recv(MAXBYTES)
 								if len(data) == 0:
 									# run = False
 									continue
-								elif data.decode() != "!!BAN\n":
-									os.write(log,"Vous avez été bannis\nVous allez être déconnecté...".encode())
+								elif data.decode() == "!!BAN\n":
+									os.write(log,"Vous avez été bannis\nVous allez être déconnecté...\n".encode())
+									time.sleep(4)
 									quit = True
-								elif data.decode() != "!!MUTE\n":
-									os.write(log,"Un modérateur vous a mute.\nVous ne pouvez plus écrire dans le chat...".encode())
-									os.close(fifo)
-								elif data.decode() != "!!UNMUTE\n":
-									os.write(log,"vous avez été pardonné, vous avez de nouveau droit a écrir dans le chat !".encode())
-									fifo =os.open(pathfifo,os.O_RDONLY|os.O_TRUNC)
+								elif data.decode() == "!!MUTE\n":
+									os.write(log,"Un modérateur vous a mute.\nVous ne pouvez plus écrire dans le chat...\n".encode())
+									mute = True
+								elif data.decode() == "!!UNMUTE\n":
+									os.write(log,"vous avez été pardonné, vous avez de nouveau droit a écrir dans le chat !\n".encode())
+									mute = False
 								elif data.decode() != "!!BEAT\n":
 									os.write(log, data)
 									
@@ -252,7 +257,7 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 					os.system("pkill xterm") #ferme tous les processus xterm
 					sys.exit(0)
 	except OSError as e:
-		print("Erreure :"+e)
+		print("Erreure :",e)
 		sys.exit(0)
 
 def main():
