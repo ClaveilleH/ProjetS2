@@ -3,7 +3,7 @@ import sys, os, signal, socket, select, random, time
 Script du jeu coté serveur
 https://webusers.i3s.unice.fr/~elozes/enseignement/systeme/
 127.0.0.1
-python3 chat_killer_server.py 127.0.0.1 25565
+python3 chat_killer_server.py 25565
 """
 HOST = "127.0.0.1" 
 MAXBYTES = 4096
@@ -151,17 +151,16 @@ class Server:
 		self.dicoClients = {} # dictionnaire socket -> Client
 		self.fileName = "/tmp/chat_killer_server{}".format(PORT)
 
-		try:
-			if os.path.exists(self.fileName):
-				print("Fichier de sauvegarde trouvé")
+		if os.path.exists(self.fileName):
+			print("Fichier de sauvegarde trouvé")
 
-				file = os.open(self.fileName, os.O_RDONLY)
-				data = ""
-				buf = os.read(file, MAXBYTES)
+			file = os.open(self.fileName, os.O_RDONLY)
+			data = ""
+			buf = os.read(file, MAXBYTES)
 
-				while buf != b"":
-					data += buf.decode()
-				buf = os.read(file, MAXBYTES)
+			while buf != b"":
+				data += buf.decode()
+			buf = os.read(file, MAXBYTES)
 
 			os.close(file)
 
@@ -180,16 +179,11 @@ class Server:
 					self.nb_clients += 1
 
 			print("Chargement terminé")
-
-		except:
-			print("Erreur: impossible de lire le fichier de sauvegarde")
-			sys.exit(1)
 				
 	def backup(self):
 		"""
 		Sauvegarde les clients dans un fichier
 		"""
-		print("Sauvegarde des clients...")
 		try:
 			file = os.open(self.fileName, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
 			data = ""
@@ -200,7 +194,6 @@ class Server:
 		except:
 			print("Erreur: impossible de sauvegarder les clients")
 			return
-		print("Sauvegarde terminée")
 
 		liste = self.socketList.copy()
 
@@ -324,6 +317,7 @@ def main():
 		Verifie si tous les clients ont envoyé un beat
 		"""
 		global BEAT_CPT
+		BEAT_CPT += 1
 		now = time.time()
 		for sock in server.socketList:
 			if sock != server.socket and sock != 0:
@@ -333,7 +327,6 @@ def main():
 		signal.alarm(BEAT_CHECK) # on remet l'alarme
 		if BEAT_CPT % 20 == 0: # on sauvegarde tous les 20 beats (1 minute)
 			server.backup()
-		BEAT_CPT += 1
 
 	try:
 		serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # IPv4, TCP
