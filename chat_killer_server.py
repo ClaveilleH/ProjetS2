@@ -12,7 +12,11 @@ BEAT_CHECK = 3
 BEAT_CPT = 0
 
 def console(server):
-	line = os.read(0, MAXBYTES).decode()
+	try:
+		line = os.read(0, MAXBYTES).decode()
+	except OSError as e:
+		print("Erreur: ", e)
+		return
 	if line[0] == '!':
 		line = line[1:]
 		if line == "quit\n":
@@ -147,15 +151,18 @@ class Server:
 		self.dicoClients = {} # dictionnaire socket -> Client
 		self.fileName = "/tmp/chat_killer_server{}".format(PORT)
 
-		if os.path.exists(self.fileName):
-			print("Fichier de sauvegarde trouvé")
-			file = os.open(self.fileName, os.O_RDONLY)
-			data = ""
-			buf = os.read(file, MAXBYTES)
-			while buf != b"":
-				data += buf.decode()
+		try:
+			if os.path.exists(self.fileName):
+				print("Fichier de sauvegarde trouvé")
+
+				file = os.open(self.fileName, os.O_RDONLY)
+				data = ""
 				buf = os.read(file, MAXBYTES)
-			
+
+				while buf != b"":
+					data += buf.decode()
+				buf = os.read(file, MAXBYTES)
+
 			os.close(file)
 
 			for line in data.split('\n'):
@@ -173,18 +180,26 @@ class Server:
 					self.nb_clients += 1
 
 			print("Chargement terminé")
+
+		except:
+			print("Erreur: impossible de lire le fichier de sauvegarde")
+			sys.exit(1)
 				
 	def backup(self):
 		"""
 		Sauvegarde les clients dans un fichier
 		"""
 		print("Sauvegarde des clients...")
-		file = os.open(self.fileName, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
-		data = ""
-		for client in self.dicoClients.values():
-			data += f"C:{client.address}:{client.pseudo}:{client.cookie}\n"
-		os.write(file, data.encode())
-		os.close(file)
+		try:
+			file = os.open(self.fileName, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
+			data = ""
+			for client in self.dicoClients.values():
+				data += f"C:{client.address}:{client.pseudo}:{client.cookie}\n"
+			os.write(file, data.encode())
+			os.close(file)
+		except:
+			print("Erreur: impossible de sauvegarder les clients")
+			return
 		print("Sauvegarde terminée")
 
 		liste = self.socketList.copy()
@@ -377,6 +392,9 @@ if __name__ == "__main__":
 	main()
 
 	print("Plus de clients, fermeture du serveur...")
-	os.remove("/tmp/chat_killer_server{}".format(PORT))
+	try:
+		os.remove("/tmp/chat_killer_server{}".format(PORT))
+	except:
+		print("Erreur: impossible de supprimer le fichier de sauvegarde")
 
 	sys.exit(0)
