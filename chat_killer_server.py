@@ -28,11 +28,24 @@ def console(server):
 					server.nb_clients -= 1
 			server.socket.close()
 
+
+			try:
+				os.remove("/tmp/chat_killer_server{}".format(PORT))
+			except:
+				print("Erreur: impossible de supprimer le fichier de sauvegarde")
+			
+			sys.exit(0)
+
+
 		elif line == "list\n":
 			print(server.get_list())
 		
 	elif line[0] == '@':
-		pseudo, command = line.split(1)[0]
+		line = line[1:]
+		if not ' ' in line:
+			print("Erreur: commande invalide")
+			return
+		pseudo, command = line.split()
 		if pseudo in server.dicoPseudo.keys():
 			client = server.dicoPseudo[pseudo]
 			if client.socket in server.socketList:
@@ -41,12 +54,12 @@ def console(server):
 				print(f"Le client {pseudo} n'est pas connecté.")
 				return
 			
-			if command == '!ban':
+			if command == '!ban' or command == 'ban':
 				client.send(str("!!BAN\n").encode())
-				server.disconnect_client(client.sock)
-			elif command == '!suspend':
+				server.disconnect_client(client.socket)
+			elif command == '!suspend' or command == 'suspend':
 				client.send(str("!!MUTE\n").encode())
-			elif command == '!forgive':
+			elif command == '!forgive' or command == 'forgive':
 				client.send(str("!!UNMUTE\n").encode())
 			else:
 				print("Commande invalide")
@@ -71,7 +84,7 @@ def message_client(sock, server):
 	try:
 		message = sock.recv(MAXBYTES)
 	except OSError as e:
-		print("Erreur: ", e)
+		# print("Erreur: ", e)
 		server.disconnect_client(sock)
 		return
 	
@@ -91,7 +104,7 @@ def message_client(sock, server):
 				client.last_beat = time.time()
 				client.send(str("!!BEAT\n").encode())
 
-			elif text == "QUIT\n" or text == "quit\n":
+			elif text == "quit":
 				server.disconnect_client(sock)
 				print(f"Client {client.pseudo} disconnected")
 				server.mess_all(f"[-]{client.pseudo}!\n".encode())
@@ -118,17 +131,17 @@ def message_client(sock, server):
 				else:
 					msg = str(f"{client.pseudo}: {text}").encode()
 					server.mess_all(msg)
-			else:   
-				print("->>>>" + text)
+			# else:   
+				# print("->>>>" + text)
 		elif text[0] == '!':
 			text = text[1:]
 			if text == "list\n":
 				msg = server.get_list() + '\n'
 				client.send(msg.encode())
-			else:
-				print("-2>>>>" + text)
-		else:
-			print("---->" + text)
+			# else:
+				# print("-2>>>>" + text)
+		# else:
+			# print("---->" + text)
 
 class Client:
 	def __init__(self, address, socket, pseudo, cookie, last_beat) -> None:
@@ -160,7 +173,7 @@ class Server:
 
 			while buf != b"":
 				data += buf.decode()
-			buf = os.read(file, MAXBYTES)
+				buf = os.read(file, MAXBYTES)
 
 			os.close(file)
 
@@ -241,7 +254,8 @@ class Server:
 					print("Erreur: client introuvable")
 					self.disconnect_client(sock)
 				except Exception as e:
-					print("Erreur: ", e)
+					# print("Erreur: ", e)
+					pass
 	
 	def disconnect_client(self, sock):  
 		"""
@@ -263,6 +277,10 @@ class Server:
 		# print(txt)
 		
 		if txt[:8] == "!!cookie":
+			if not ' ' in txt:
+				print("Erreur: cookie invalide")
+				self.socketList.remove(clientsocket)
+				return
 			cookie = txt.split()[1]
 			
 			cookie = cookie # on enleve le \n
@@ -370,6 +388,8 @@ def main():
 
 			else:
 				message_client(sock, server)
+	
+	# il n'y a plus de clients
 				
 
 
@@ -383,6 +403,7 @@ if __name__ == "__main__":
 	
 	
 	main()
+
 
 	print("Plus de clients, fermeture du serveur...")
 	try:
