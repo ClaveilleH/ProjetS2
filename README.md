@@ -14,7 +14,7 @@ Points amélioré depuis la démo :	- La commande !reconnect fonctionne
 
 (DONE)			Gestion de pseudo, de messages privés, et de la commande !list: 12/20
 
-  (Gestion des commandes !suspend, !ban, et !forgive: 14/20))
+(DONE)      Gestion des commandes !suspend, !ban, et !forgive: 14/20))
 
 (DONE)			Tolérance aux pannes des terminaux qui exécutent les commandes tail -f LOG et cat > TUBE, relance des terminaux et des commandes : 16/20
 
@@ -30,7 +30,7 @@ Commentaires(CLIENT) :
 
 - les pseudos fonctionnent comme des identifiants : afin de gérer les cookies de plusieurs clients sur une seule machine, le fichier est "pseudo.cookie". Pour vous reconnecter après un crash, il faut rentrer le meme pseudo.
 - !quit est une déconnexion "propre" qui supprime pseudo.fifo, pseudo.log, pseudo.cookie
-- si il y a un crash server et que le client quitte en etant hors-ligne, le server peut crash si le client tente de se reconnecter avec le meme pseudo.
+- si il y a un crash server et que le client !quit en etant hors-ligne, le server peut crash si le client tente de se reconnecter avec le meme pseudo.
 
 
 
