@@ -27,7 +27,10 @@ def erreur_rep_server():
 	
 def server_connection(): #Protocole de gestion des connexions client-server
 	HOST = "127.0.0.1"
-	PORT = 2000
+	if len(sys.argv)>1:
+		PORT = sys.argv[1]
+	else :
+		PORT = 25565
 	sockaddr = (HOST, PORT)
 	global server
 	global server_statut
@@ -97,31 +100,42 @@ def help_offline(fd):#Affichage des commandes hors ligne
 
 def term_saisie():    #tant que run == True, fermer un term le relance tout de suite
 	global pathfifo
-	while True :
-		pid = os.fork()
-		if pid == 0:
-			argv=["xterm","-e","cat > "+pathfifo]
-			os.execvp("xterm",argv) #lance le terminal ou entree standard > fifo
-		else :
-			os.wait()
+	global quit
+	try :
+		while True :
+			pid = os.fork()
+			if pid == 0:
+				argv=["xterm","-e","cat > "+pathfifo]
+				os.execvp("xterm",argv) #lance le terminal ou entree standard > fifo
+			else :
+				os.wait()
+	except :
+		quit = True
 			
 
 def term_affichage():	#tant que run == True, fermer un term le relance tout de suite
 	global pathlog
-	while True :
-		pid = os.fork()
-		if pid == 0:
-			argv1 =["xterm","-e","tail -f "+pathlog]
-			os.execvp("xterm",argv1)
-		else :
-			os.wait()
+	global quit
+	try:
+		while True :
+			pid = os.fork()
+			if pid == 0:
+				argv1 =["xterm","-e","tail -f "+pathlog]
+				os.execvp("xterm",argv1)
+			else :
+				os.wait()
+	except : 
+		quit = True
+
+def quitter(p1,p2):
+	os.kill(p1,signal.SIGQUIT)
+	os.kill(p2,signal.SIGQUIT)
 
 
 def lancement_client(socketlist,server): #Protocol de communication client-server
 	if not (os.path.exists(pathfifo)):
 		os.mkfifo(pathfifo) #tube nommé pour communication entre terminal de saisie et superviseur
 	pid = os.fork()
-	quit = False
 	if pid == 0:
 		term_saisie()
 	else :
@@ -134,9 +148,12 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 		else:
 			global server_statut
 			global run
+			global quit
+			cleanquit = False
+			quit = False
 			help(log)
-			while run :
-				while server_statut :
+			while run and not(quit): #Boucle du client
+				while server_statut : #Boucle client en ligne
 					(activesockets, _, _) = select.select(socketlist, [], [])
 					for s in activesockets:
 						if s == fifo:
@@ -154,8 +171,8 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 									run = False
 									server_statut = False
 									quit = True
-									os.kill(pid,signal.SIGQUIT)
-									os.kill(pid2,signal.SIGQUIT)
+									cleanquit=True
+									quitter(pid1,pid2)
 									break
 								elif lineD == "!list\n":
 									try:
@@ -183,7 +200,7 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 				help_offline(log)
 				offline = True
 				
-				while offline and not(quit):
+				while offline and not(quit): #boucle client hors-ligne
 					line = os.read(fifo, MAXBYTES)
 					lineD = line.decode()
 					if len(line)==0:
@@ -194,8 +211,8 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 							run = False
 							server_statut = False
 							quit = True
-							os.kill(pid,signal.SIGQUIT)
-							os.kill(pid2,signal.SIGQUIT)
+							cleanquit=True
+							quitter(pid1,pid2)
 							break
 						elif lineD == "!help\n":
 							help_offline(log)
@@ -206,13 +223,23 @@ def lancement_client(socketlist,server): #Protocol de communication client-serve
 							
 						else:
 							os.write(log,"commande inconnue\n".encode('utf-8'))
-			os.close(fifo)
-			os.close(log)
-			os.system("rm "+pathfifo)
-			os.system("rm "+pathlog)
-			os.system("rm "+pathcookie)
-			os.system("pkill xterm") #ferme tous les processus xterm
-			sys.exit(0)
+			if cleanquit : #Fermeture !quit
+				os.close(fifo)
+				os.close(log)
+				os.system("rm "+pathfifo)
+				os.system("rm "+pathlog)
+				os.system("rm "+pathcookie)
+				os.system("pkill xterm") #ferme tous les processus xterm
+				sys.exit(0)
+			else :	#Fermeture car terminal cassé
+				quitter(pid1,pid2)
+				os.close(fifo)
+				os.close(log)
+				os.system("rm "+pathfifo)
+				os.system("rm "+pathlog)
+				os.system("rm "+pathcookie)
+				os.system("pkill xterm") #ferme tous les processus xterm
+				sys.exit(0)
 
 def main():
 	socketlist,servert=server_connection()
@@ -227,4 +254,5 @@ if __name__ == "__main__":
 	MAXBYTES = 4096
 	run = False
 	COOKIE = False
+	
 	main()
