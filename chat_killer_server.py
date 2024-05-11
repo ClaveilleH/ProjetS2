@@ -171,6 +171,7 @@ class Server:
 					self.dicoClients[address] = client
 					# self.socketList.append(client.socket) # on ne peut pas ajouter le socket car il n'est pas encore reconnecté
 					self.nb_clients += 1
+					
 			print("Chargement terminé")
 				
 	def backup(self):
@@ -257,11 +258,11 @@ class Server:
 			cookie = txt.split()[1]
 			
 			cookie = cookie # on enleve le \n
-			print("cookie: ", cookie)
-			print(self.dicoClients)
+			# print("cookie: ", cookie)
+			# print(self.dicoClients)
 
 			for client in self.dicoClients.values():
-				print(client.cookie, cookie)
+				# print(client.cookie, cookie)
 				if client.cookie == cookie: # on retrouve le client
 					
 					if client.socket in self.socketList: # si le serveur a crashé, le client a été déconnecté
@@ -341,7 +342,7 @@ def main():
 		try:
 			(activesockets, _, _) = select.select(server.socketList, [], []) 
 
-		except Exception as e:
+		except Exception as e: # un client a été déconnecté
 			# print("Erreur: ", e)
 			continue
 		#! gerer les exceptions
@@ -372,6 +373,8 @@ if __name__ == "__main__":
 	
 	
 	main()
+
 	print("Plus de clients, fermeture du serveur...")
 	os.remove("/tmp/chat_killer_server{}".format(PORT))
+
 	sys.exit(0)
